@@ -1,0 +1,16 @@
+# Core Deep Learning & NLP
+torch>=2.2.0
+transformers>=4.40.0
+accelerate>=0.28.0
+datasets>=2.18.0
+
+# Reinforcement Learning & Environment
+gymnasium>=0.29.0
+stable-baselines3>=2.3.0
+
+# Utilities & Metrics
+scikit-learn>=1.4.0
+
+# Visualization & Analytics
+matplotlib>=3.8.0
+seaborn>=0.13.0
