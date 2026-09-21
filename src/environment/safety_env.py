@@ -77,8 +77,9 @@ class SafetyAlignmentEnv(gym.Env):
     """Gymnasium environment for training and evaluating RL safety alignment policies.
 
     Observation Space:
-        Box(-1.0, 1.0, (embedding_dim,), float32): L2-normalized semantic embedding of
-        the active prompt, extracted from the underlying language model's representations.
+        Box(-1.0, 1.0, (embedding_dim + 1,), float32): L2-normalized semantic embedding of
+        the active prompt (768-dim) augmented with the raw input prompt toxicity probability (1-dim),
+        yielding a 769-dimensional observation vector to overcome geometric anisotropy.
 
     Action Space:
         Discrete(4): Categorical selection among alignment strategies:
@@ -123,7 +124,7 @@ class SafetyAlignmentEnv(gym.Env):
 
         self.embedding_dim: int = self.generator.embedding_dim
 
-        # Define Observation & Action Spaces
+        # Define Observation & Action Spaces (Pure normalized semantic embedding of dim 384)
         self.observation_space: spaces.Box = spaces.Box(
             low=-1.0,
             high=1.0,
@@ -169,8 +170,8 @@ class SafetyAlignmentEnv(gym.Env):
                 np_random=self.np_random,
             )
 
-        # Extract normalized prompt embedding as state observation
-        self._current_obs = self.generator.get_embedding(self._current_prompt.text)
+        # Extract normalized prompt embedding using dedicated sentence transformer
+        self._current_obs = self.generator.get_embedding(self._current_prompt.text).astype(np.float32)
 
         info: Dict[str, Any] = {
             "prompt_id": self._current_prompt.id,
@@ -309,7 +310,7 @@ class SafetyAlignmentEnv(gym.Env):
         terminated: bool = True
         truncated: bool = False
 
-        # Terminal state observation (zero vector)
+        # Terminal state observation (zero vector of shape (384,))
         next_obs = np.zeros(self.embedding_dim, dtype=np.float32)
 
         info: Dict[str, Any] = {

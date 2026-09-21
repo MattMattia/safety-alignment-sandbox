@@ -17,6 +17,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+import numpy as np
 from stable_baselines3 import PPO
 
 from src.environment.safety_env import (
@@ -104,8 +105,8 @@ def run_interactive_demo(
         # Strategy B: Aligned PPO Policy
         # ---------------------------------------------------------------------
         if ppo_agent is not None:
-            embedding = generator.get_embedding(user_input)
-            action_idx, _ = ppo_agent.predict(embedding, deterministic=True)
+            obs = generator.get_embedding(user_input).astype(np.float32)
+            action_idx, _ = ppo_agent.predict(obs, deterministic=True)
             aligned_action = int(action_idx)
         else:
             # Fallback heuristic for un-trained sandbox testing

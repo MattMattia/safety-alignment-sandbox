@@ -8,6 +8,7 @@ extraction for RL observation spaces.
 from typing import Optional
 import numpy as np
 import torch
+from sentence_transformers import SentenceTransformer
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
@@ -15,14 +16,16 @@ class BaseLanguageModel:
     """Lightweight causal language model wrapper for policy environment simulations.
 
     Designed for fast inference during RL rollout steps. Handles device allocation,
-    controlled decoding parameters, and prompt embedding extraction.
+    controlled decoding parameters, and prompt embedding extraction via a dedicated
+    sentence encoder (all-MiniLM-L6-v2) for isotropic semantic state representations.
 
     Attributes:
         model_name: Hugging Face model repository identifier (default: 'distilgpt2').
         device: torch.device indicating execution target ('cuda' or 'cpu').
         tokenizer: Pretrained Hugging Face tokenizer instance.
         model: Pretrained causal LM instance.
-        embedding_dim: Dimensionality of the model's hidden states (768 for DistilGPT-2).
+        sentence_encoder: Dedicated SentenceTransformer encoder for semantic state representations.
+        embedding_dim: Dimensionality of the sentence encoder latent space (384 for all-MiniLM-L6-v2).
     """
 
     DEFAULT_MODEL: str = "distilgpt2"
@@ -32,7 +35,7 @@ class BaseLanguageModel:
         model_name: Optional[str] = None,
         device: Optional[str] = None,
     ) -> None:
-        """Initializes the generator with model weights and device configuration.
+        """Initializes the generator with model weights, device configuration, and sentence encoder.
 
         Args:
             model_name: Hugging Face repo ID. Defaults to 'distilgpt2'.
@@ -57,10 +60,9 @@ class BaseLanguageModel:
         self.model.to(self.device)
         self.model.eval()
 
-        # Cache hidden size for environment observation space definitions
-        self.embedding_dim: int = getattr(
-            self.model.config, "hidden_size", getattr(self.model.config, "n_embd", 768)
-        )
+        # Dedicated sentence encoder for high-variance, isotropic semantic embeddings
+        self.sentence_encoder = SentenceTransformer("all-MiniLM-L6-v2", device=str(self.device))
+        self.embedding_dim: int = 384
 
     def generate(
         self,
@@ -130,7 +132,7 @@ class BaseLanguageModel:
         return response
 
     def get_embedding(self, text: str) -> np.ndarray:
-        """Extracts a mean-pooled, normalized embedding vector from the transformer.
+        """Extracts a normalized semantic sentence embedding using all-MiniLM-L6-v2.
 
         Used as the continuous state observation vector for the Gymnasium RL environment.
 
@@ -138,29 +140,12 @@ class BaseLanguageModel:
             text: Input string to embed.
 
         Returns:
-            np.ndarray: 1D float32 array of shape (embedding_dim,).
+            np.ndarray: 1D float32 array of shape (embedding_dim,) = (384,).
         """
-        inputs = self.tokenizer(
+        embedding = self.sentence_encoder.encode(
             text,
-            return_tensors="pt",
-            truncation=True,
-            max_length=256,
-            padding=True,
+            convert_to_numpy=True,
+            normalize_embeddings=True,
         )
-        inputs = {k: v.to(self.device) for k, v in inputs.items()}
-
-        with torch.no_grad():
-            outputs = self.model(**inputs, output_hidden_states=True)
-            # Use last hidden state: shape (1, seq_len, hidden_size)
-            last_hidden = outputs.hidden_states[-1]
-            # Mean pooling over non-padded tokens
-            attention_mask = inputs["attention_mask"].unsqueeze(-1)
-            sum_embeddings = torch.sum(last_hidden * attention_mask, dim=1)
-            sum_mask = torch.clamp(attention_mask.sum(dim=1), min=1e-9)
-            mean_pooled = sum_embeddings / sum_mask
-
-            # L2 normalize
-            normalized = torch.nn.functional.normalize(mean_pooled, p=2, dim=1)
-
-        return normalized.squeeze(0).detach().cpu().numpy().astype(np.float32)
+        return embedding.astype(np.float32)
 
