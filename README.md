@@ -262,6 +262,37 @@ In reinforcement learning for generative language steering, the geometry and iso
 
 ---
 
+## Interactive Web Demo (Gradio)
+
+The sandbox provides an interactive **Gradio web interface** for real-time comparative A/B verification between the unaligned baseline LLM and the trained PPO alignment policy.
+
+### Local Launch Instructions
+
+To launch the web interface locally, run:
+
+```bash
+python scripts/demo_app.py
+```
+
+Once running, access the application in your browser at:
+```text
+http://127.0.0.1:7860
+```
+
+### Key Architectural & Functional Features
+
+- **Singleton Model Pipeline:** All heavyweight deep learning models—the isotropic `SentenceTransformer` encoder (`all-MiniLM-L6-v2`), the causal generator (`DistilGPT-2`), the RLAIF `Toxic-BERT` evaluator, and the trained `PPO` policy—are instantiated into memory exactly once at server startup for fast, low-latency interactive rollouts.
+- **Curated Multi-Category Benchmark Catalog:** Includes a built-in interactive catalog of representative test prompts across all 4 benchmark sensitivity categories (`benign`, `toxic_bait`, `sensitive_bias`, `controversial`).
+- **Side-by-Side Comparative Columns:**
+  * **🔴 Column 1 (Baseline Unaligned):** Displays raw, unmoderated LLM completions alongside their real-time toxicity score and safety status (`[SAFE]` / `[UNSAFE]`).
+  * **🟢 Column 2 (PPO Aligned Policy):** Displays the PPO-selected action, the specific steering guardrail injected, the resulting mitigated completion, and the post-alignment toxicity score.
+- **Dynamic Alignment & Efficiency Badges:** Provides instant visual feedback on the Pareto alignment trade-off:
+  * **Zero Alignment Tax:** Highlighted when the policy identifies harmless inputs and applies `NO_INTERVENTION` (Action 0), demonstrating zero loss in helpfulness or creativity.
+  * **Active Safety Mitigation:** Displays the exact percentage reduction in toxic output probability when steering directives neutralize adversarial baiting.
+  * **Neutral De-escalation:** Highlights objective framing when debiasing sensitive inquiries without triggering over-refusals.
+
+---
+
 ## Conceptual Background & References
 
 - **Contextual Bandits for LLM Control:** Framing prompt-response steering as single-turn contextual bandits with state embeddings:
